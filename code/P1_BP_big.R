@@ -1,8 +1,8 @@
 ######################################################################################
 # Ryan Murphy, Qi Wang, Linna Henry October 2015, Machine Learning
-# Homework 2, Problem 1, Small Beleif Propegation
+# Homework 2, Problem 1, Big Beleif Propegation
 #
-#  Do belief propegation on the small burglary network
+#  Do belief propegation on the alarm network
 #
 #
 ######################################################################################
@@ -48,14 +48,14 @@ instantiateNodes <- function(iter, nNodes, nodeNames){
 # ---------------------------------------------------
 
 # Set parameters
-obsVars <- c("JOHNCALLS") #Name of node we have evidence on
-obsValues <- c("TRUE")
+obsVars <- c("BP", "EXPCO2", "SAO2", "ARTCO2", "PRESS") #Name of node we have evidence on
+obsValues <- c("NORMAL", "LOW", "NORMAL", "NORMAL", "NORMAL")
 names(obsValues) <- obsVars
-MAX.ITER <- 100
+MAX.ITER <- 500
 EPSILON <- 1e-6
 
 #Read in
-origCpts <- bnlearn::read.bif("raw/p1Infile.bif")
+origCpts <- bnlearn::read.bif("raw/alarm.bif")
 
 # Get names of nodes
 nodes <- names(origCpts)
@@ -161,10 +161,6 @@ GraphNode <- function(node, observedValue = NULL){#observedValue is a character 
   return(me)
 }
 
-#Define member accessors
-getNode <- function(graphObj){graphObj$node}
-is.GraphNode <- function(graphObj){return(all(class(graphObj) == c("list", "GraphNode")))}
-
 # Instantiate list containing nodes at all iterations objects
 bpList <- vector("list", length = MAX.ITER)
 
@@ -176,15 +172,15 @@ instantiateNodes(iter, numNodes, nodes)
 
 #Set all lambda values to 1(vector) except observed
 for(ii in 1:numNodes){
-  currNode <- bpList[[iter]][[ii]]
+  nodeName <- nodes[ii]
+  currNode <- bpList[[iter]][[nodeName]]
   
   # Init all lambda values to one, except the observed
   if(currNode$isObserved == FALSE){
-    nam <- names(bpList[[iter]][[ii]]$laVal)
-    bpList[[iter]][[ii]]$laVal <- rep(1, currNode$scopeLength)
-    names(bpList[[iter]][[ii]]$laVal) <- nam
-  }else{#If observed, make an indicator vector
-    bpList[[iter]][[ii]]$laVal <- bpList[[iter]][[ii]]$selfInfo
+    bpList[[iter]][[nodeName]]$laVal <- rep(1, currNode$scopeLength)
+    names(bpList[[iter]][[nodeName]]$laVal) <- currNode$scope
+    }else{#If observed, make an indicator vector
+    bpList[[iter]][[nodeName]]$laVal <- bpList[[iter]][[nodeName]]$selfInfo
   }
   
   # lambda message to parents = 1
@@ -192,34 +188,32 @@ for(ii in 1:numNodes){
   if(currNode$hasParents){
     
     #Set the pi value
-    nam <- names(bpList[[iter]][[ii]]$piVal)
-    bpList[[iter]][[ii]]$piVal <- rep(1, currNode$scopeLength)
-    names(bpList[[iter]][[ii]]$piVal) <- nam
-    
+    bpList[[iter]][[nodeName]]$piVal <- rep(1, currNode$scopeLength)
+    names(bpList[[iter]][[nodeName]]$piVal) <- currNode$scope
+      
     #set lambda msg for each parent
     for(kk in 1:currNode$numParents){
       
       ##need to save names to use rep
-      nam <- names(bpList[[iter]][[ii]]$laMsg[[kk]])
-      bpList[[iter]][[ii]]$laMsg[[kk]] <- rep(1, length(getScope(currNode$parents[kk], cpts)))
-      names(bpList[[iter]][[ii]]$laMsg[[kk]] ) <- nam
+      nam <- names(bpList[[iter]][[nodeName]]$laMsg[[kk]])
+      bpList[[iter]][[nodeName]]$laMsg[[kk]] <- rep(1, length(getScope(currNode$parents[kk], cpts)))
+      names(bpList[[iter]][[nodeName]]$laMsg[[kk]] ) <- nam
+      rm(nam)
     }
   }else{ #For roots, set pi to be marginal probabilities
     for(kk in 1:currNode$scopeLength){
       tmpVal <- currNode$scope[kk]
       indx <- which(cpts[[currNode$node]]$probdf[,1] == tmpVal)
-      bpList[[iter]][[ii]]$piVal[kk] <- cpts[[currNode$node]]$probdf[indx,2]
+      bpList[[iter]][[nodeName]]$piVal[kk] <- cpts[[nodeName]]$probdf[indx,2]
     }
   }
   # pi to children
   if(currNode$hasChildren){
     for(kk in 1:currNode$numChildren){
-      
-      nam <- names(bpList[[iter]][[ii]]$piMsg[[kk]])
-      bpList[[iter]][[ii]]$piMsg[[kk]] <- rep(1, currNode$scopeLength)
-      
-      names(bpList[[iter]][[ii]]$piMsg[[kk]]) <- nam
-    }
+       bpList[[iter]][[nodeName]]$piMsg[[kk]] <- rep(1, currNode$scopeLength)
+       # change all the length(currNode$piMsg) to scope I did just now
+       names(bpList[[iter]][[nodeName]]$piMsg[[kk]]) <- currNode$scope
+     }
   }
   
 }
